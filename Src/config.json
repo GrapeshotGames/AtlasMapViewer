@@ -1,0 +1,11 @@
+{
+    "Host": "",
+    "Port": 8880,
+    "TerritoryURL": "http://localhost:8881/territoryTiles/",
+    "StaticDir": "./www",
+    "FetchRateInSeconds": 30,
+    "DisableCommands": true,
+    "RedisAddress": "127.0.0.1:6379",
+    "RedisPassword": "foobared",
+    "RedisDB": 0
+}
