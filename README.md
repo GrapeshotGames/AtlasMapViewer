@@ -37,6 +37,7 @@ Setup the config.json to point at your redis database and a few other things lik
     "RedisPassword": "foobared",
 }
 ```
+Note: The config.json stays relative to binary path.
 
 ### Web App
 The client file "www/config.js" holds some cluster specific information like the grid size.
@@ -57,4 +58,9 @@ const config = {
 }
 ```
 
-Note: The config.json stays relative to binary path.
+### Linking AtlasTerritoryMap
+![Alt text](Example2.jpg?raw=true "Exmaple2")
+
+Point your `config.json`'s TerritoryURL url to a valid base path that is hosting the territory overlay tile images. This is usually the location of your AtlasTerritoryMap binary itself (can be straight ip) or a location that it outputs to. Do note that you must have it enabled on AtlasTerritoryMap's config file `"EnableTileGeneration": true,`
+
+
