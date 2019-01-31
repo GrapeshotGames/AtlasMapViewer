@@ -266,7 +266,7 @@ func newEntityInfo(record map[string]string) *EntityInfo {
 
 func getTerritoryURL(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Method, r.URL.Path)
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+//	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 
 	wrapper := make(map[string]string)
@@ -283,7 +283,7 @@ func getTerritoryURL(w http.ResponseWriter, r *http.Request) {
 
 func getTribes(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Method, r.URL.Path)
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+//	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 
 	tribeDataLock.RLock()
@@ -301,7 +301,7 @@ func getTribes(w http.ResponseWriter, r *http.Request) {
 // getData returns the latest game data pulled from the backend.
 func getData(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Method, r.URL.Path)
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+//	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 
 	gameDataLock.RLock()
@@ -319,7 +319,7 @@ func getData(w http.ResponseWriter, r *http.Request) {
 // getPathTravelled returns a fake path for the specified ship.
 func getPathTravelled(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Method, r.URL.Path)
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+//	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if r.Method != "GET" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -368,7 +368,7 @@ func getPathTravelled(w http.ResponseWriter, r *http.Request) {
 // ID is the packed server ID; X and Y are the relative lng and lat locations.
 func sendCommand(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Method, r.URL.Path)
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+//	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if r.Method != "POST" || config.DisableCommands {
 		w.WriteHeader(http.StatusMethodNotAllowed)
