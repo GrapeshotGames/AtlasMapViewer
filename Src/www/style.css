@@ -99,21 +99,33 @@ ol.History {
 }
 
 .legend {
+    display: grid;
+    grid-gap: 2px;
+    grid-template-columns: auto;
+
     position: absolute;
     top: 4.3em;
     left: 1em;
     padding: 1em;
-    padding-right: 3em;
+    padding-right: 1em;
     z-index: 501;
     line-height: 18px;
     color: #555;
 }
-.legend i {
-    width: 18px;
-    height: 18px;
-    float: left;
-    margin-right: 8px;
-    opacity: 0.7;
+.legend-entry {
+    display: grid;
+    grid-template-columns: 32px auto;
+    grid-template-rows: 32px;
+    grid-gap: 2px;
+    grid-template-areas: "a b"
+}
+.legend-entry-a {
+    grid-area: a;
+}
+.legend-entry-b {
+    grid-area: b;
+    align-self: center;
+    justify-self: left;
 }
 
 @font-face{
@@ -148,4 +160,29 @@ ol.History {
     right: 0;
     z-index: 99;
     opacity: 0.025;
+}
+
+.islandlabel {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    align-content: flex-start;
+    pointer-events:none;
+    position: absolute;
+    left: 50%;
+    margin-right: -50%;
+    transform: translate(-50%, -10%);
+}
+
+.islandlabel_name {
+    white-space:nowrap;
+    text-align: center;
+    font-weight: 1;
+    color: white;
+    pointer-events:none;
+}
+
+.islandlabel_icon {
+    pointer-events:none;
 }

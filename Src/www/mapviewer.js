@@ -7,6 +7,278 @@ if (!window) {
     L = require("leaflet")
 }
 
+//https://www.geeksforgeeks.org/implementation-priority-queue-javascript/
+class QElement {
+  constructor(element, priority) {
+    this.element = element;
+    this.priority = priority;
+  }
+}
+
+class PriorityQueue {
+  constructor() {
+    this.items = [];
+  }
+
+  enqueue(element, priority) {
+    var qElement = new QElement(element, priority);
+    var contain = false;
+    for (var i = 0; i < this.items.length; i++) {
+      if (this.items[i].priority > qElement.priority) {
+        this.items.splice(i, 0, qElement);
+        contain = true;
+        break;
+      }
+    }
+    if (!contain) {
+      this.items.push(qElement);
+    }
+  }
+
+  dequeue() {
+    return this.items.shift();
+  }
+
+  front() {
+    return this.items[0];
+  }
+
+  isEmpty() {
+    return this.items.length == 0;
+  }
+
+  clear() {
+    this.items = []
+  }
+}
+
+
+function formatSeconds(InTime) {
+  var Days = 0
+  var Hours = Math.floor(InTime / 3600);
+  var Minutes = Math.floor((InTime % 3600) / 60);
+  var Seconds = Math.floor((InTime % 3600) % 60);
+  if (Hours >= 24) {
+    Days = Math.floor(Hours / 24);
+    Hours = Hours - (Days * 24)
+  }
+
+  if (Days > 0)
+    return Days + "d:" + Hours + "h:" + Minutes + "n:" + Seconds + "s";
+  else if (Hours > 0)
+    return Hours + "h:" + Minutes + "m:" + Seconds + "s";
+  else if (Minutes > 0)
+    return Minutes + "m:" + Seconds + "s";
+  else
+    return Seconds + "s";
+}
+
+function getWarState(Island) {
+  var now = Math.floor(Date.now() / 1000)
+  if (now >= Island.WarStartUTC && now < Island.WarEndUTC) {
+    Island.bWar = true;
+    Island.WarNextUpdateSec = Island.WarEndUTC - now;
+    return "AT WAR! ENDS IN " + formatSeconds(Island.WarNextUpdateSec)
+  } else if (now < Island.WarStartUTC) {
+    Island.bWar = false;
+    Island.WarNextUpdateSec = Island.WarStartUTC - now;
+    return "WAR BEGINS IN " + formatSeconds(Island.WarNextUpdateSec)
+  } else if (now < Island.WarEndUTC + 5 * 24 * 3600) {
+    Island.bWar = false;
+    Island.WarNextUpdateSec = Island.WarEndUTC + 5 * 24 * 3600 - now;
+    return "CAN DECLARE WAR IN " + formatSeconds(Island.WarNextUpdateSec)
+  } else {
+    Island.bWar = false;
+    Island.WarNextUpdateSec = Number.MAX_SAFE_INTEGER;
+    return "War can be declared on this settlement."
+  }
+}
+
+function getPeaceState(Island) {
+  var now = new Date();
+  var CombatStartSeconds = Island.CombatPhaseStartTime;
+  var CombatEndSeconds = (CombatStartSeconds + 32400) % 86400;
+  var CurrentDaySeconds = (3600 * now.getUTCHours()) + (60 * now.getUTCMinutes()) + now.getUTCSeconds();
+
+  if (CombatEndSeconds > CombatStartSeconds) {
+    if (CurrentDaySeconds < CombatStartSeconds) {
+      Island.bCombat = false;
+      Island.CombatNextUpdateSec = CombatStartSeconds - CurrentDaySeconds;
+      return "In Peace Phase. " + formatSeconds(Island.CombatNextUpdateSec) + " remaining"
+    } else if (CurrentDaySeconds >= CombatStartSeconds && CurrentDaySeconds < CombatEndSeconds) {
+      Island.bCombat = true;
+      Island.CombatNextUpdateSec = CombatEndSeconds - CurrentDaySeconds;
+      return "In Combat Phase! " + formatSeconds(Island.CombatNextUpdateSec) + " remaining"
+    } else {
+      Island.bCombat = false;
+      Island.CombatNextUpdateSec = 86400 - CurrentDaySeconds + CombatStartSeconds
+      return "In Peace Phase." + formatSeconds(Island.CombatNextUpdateSec) + " remaining"
+    }
+  } else {
+    if (CurrentDaySeconds >= CombatStartSeconds) {
+      Island.bCombat = true;
+      Island.CombatNextUpdateSec = 86400 - CurrentDaySeconds + CombatEndSeconds;
+      return "In Combat Phase! " + formatSeconds(Island.CombatNextUpdateSec) + " remaining"
+    } else if (CurrentDaySeconds < CombatEndSeconds) {
+      Island.bCombat = true;
+      Island.CombatNextUpdateSec = CombatEndSeconds - CurrentDaySeconds;
+      return "In Combat Phase! " + formatSeconds(Island.CombatNextUpdateSec) + " remaining"
+    } else {
+      Island.bCombat = false;
+      Island.CombatNextUpdateSec = CombatStartSeconds - CurrentDaySeconds;
+      return "In Peace Phase. " + formatSeconds(Island.CombatNextUpdateSec) + " remaining"
+    }
+  }
+}
+
+function getIslandIcon(Island) {
+  if (Island.bWar || Island.bCombat)
+    return "HUD_War_Icon.png";
+  else
+    return "HUD_Peace_Icon.png";
+}
+
+var GlobalSelectedIsland = null;
+var GlobalPriortyQueue = new PriorityQueue();
+
+setInterval(updateIsland, 1000)
+
+function updateIsland() {
+  while (!GlobalPriortyQueue.isEmpty()) {
+    var now = Math.floor(Date.now() / 1000);
+    if (GlobalPriortyQueue.front().priority > now)
+      break;
+
+    var Island = GlobalPriortyQueue.dequeue().element;
+
+    // tickle island state
+    getWarState(Island);
+    getPeaceState(Island);
+
+    // update the icon
+    var el = document.getElementById("island_" + Island.IslandID);
+    if (el != null) {
+      var img = el.getElementsByClassName("islandlabel_size")[0];
+      img.src = getIslandIcon(Island);
+    }
+
+    // calc new update time and put island back in the queue
+    var nextUpdate = Island.CombatNextUpdateSec;
+    if (Island.WarNextUpdateSec < nextUpdate)
+      nextUpdate = Island.WarNextUpdateSec;
+    GlobalPriortyQueue.enqueue(Island, now + nextUpdate + 1);
+  }
+
+  if (GlobalSelectedIsland != null) {
+    var phase = document.getElementById("pop_up_phase")
+    if (phase != null)
+      phase.innerHTML = getPeaceState(GlobalSelectedIsland)
+
+    var war = document.getElementById("pop_up_war")
+    if (war != null)
+      war.innerHTML = getWarState(GlobalSelectedIsland)
+  }
+}
+
+// https://gis.stackexchange.com/questions/238762/rollover-leaflet-popup-on-mouseover
+// https://jsfiddle.net/eL8bvre7/
+class IslandCircle extends L.Circle {
+  constructor(latlng, options) {
+    super(latlng, options)
+
+    this.Island = null
+
+    this.bindPopup = this.bindPopup.bind(this)
+    this._popupMouseOut = this._popupMouseOut.bind(this)
+    this._getParent = this._getParent.bind(this)
+  }
+
+  bindPopup(htmlContent, options) {
+    if (options && options.showOnMouseOver) {
+
+      // call the super method
+      L.Marker.prototype.bindPopup.apply(this, [htmlContent, options]);
+
+      // unbind the click event
+      this.off("click", this.openPopup, this);
+
+      // bind to mouse over
+      this.on("mouseover", function (e) {
+        // get the element that the mouse hovered onto
+        var target = e.originalEvent.fromElement || e.originalEvent.relatedTarget;
+        var parent = this._getParent(target, "leaflet-popup");
+
+        // check to see if the element is a popup, and if it is this marker's popup
+        if (parent == this._popup._container)
+          return true;
+
+        // show the popup
+        GlobalSelectedIsland = this.Island
+        this.openPopup();
+
+      }, this);
+
+      // and mouse out
+      this.on("mouseout", function (e) {
+
+        // get the element that the mouse hovered onto
+        var target = e.originalEvent.toElement || e.originalEvent.relatedTarget;
+
+        // check to see if the element is a popup
+        if (this._getParent(target, "leaflet-popup")) {
+          L.DomEvent.on(this._popup._container, "mouseout", this._popupMouseOut, this);
+          return true;
+        }
+
+        this.closePopup();
+        GlobalSelectedIsland = null
+
+      }, this);
+    }
+  }
+
+  _popupMouseOut(e) {
+    // detach the event
+    L.DomEvent.off(this._popup, "mouseout", this._popupMouseOut, this);
+
+    // get the element that the mouse hovered onto
+    var target = e.toElement || e.relatedTarget;
+
+    // check to see if the element is a popup
+    if (this._getParent(target, "leaflet-popup"))
+      return true;
+
+    // check to see if the marker was hovered back onto
+    if (target == this._path)
+      return true;
+
+    // hide the popup
+    this.closePopup();
+    GlobalSelectedIsland = null;
+  }
+
+  _getParent(element, className) {
+    if (element == null)
+      return false;
+    var parent = element.parentNode;
+    while (parent != null) {
+      if (parent.className && L.DomUtil.hasClass(parent, className))
+        return parent;
+      parent = parent.parentNode;
+    }
+    return false;
+  }
+}
+
+function escapeHTML(unsafe_str) {
+  return unsafe_str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/\'/g, '&#39;'); // '&apos;' is not valid HTML 4
+}
+
 // possibilities are a list of all known commands and their parameters
 const possibilities = config.Suggestions
 
@@ -150,53 +422,21 @@ class WorldMap extends React.Component {
 
   constructor(props) {
     super(props)
+
+    this.worldMap = null
+
+    this.constructMap = this.constructMap.bind(this)
     this.forceTileReload = this.forceTileReload.bind(this)
+    this.componentDidMount = this.componentDidMount.bind(this)
   }
 
-  forceTileReload() {
-    console.log("forceTileReload!")
+  constructMap() {
+    if (this.worldMap != null) {
+      this.worldMap.remove()
+      this.worldMap = null
+    }
 
-    fetch("territoryURL")
-      .then(res => res.json())
-      .then(config => {
-        if (config.url) {
-          if (this.territoryLayer) {
-            this.worldMap.removeLayer(this.territoryLayer)
-            delete this.territoryLayer
-          }
-
-          this.territoryLayer = L.tileLayer(config.url + "{z}/{x}/{y}.png?t={cachebuster}", {
-            maxZoom: 6,
-            minZoom: 1,
-            bounds: L.latLngBounds([0,0],[-256,256]),
-            noWrap: true,
-            cachebuster: function() { return Math.random(); }
-          })
-
-          this.territoryLayer.addTo(this.worldMap)
-        } else {
-          console.error("Did not receive territory URL")
-        }
-      })
-      .catch((err) => {
-        console.error(err)
-        this.setState({
-          notification: {
-            type: "error",
-            msg: "Failed to get territory URL from server",
-          }
-        })
-      })
-  }
-
-  componentWillUnmount() {
-    clearInterval(this.timer);
-  }
-
-  componentDidMount() {
-
-    this.forceTileReload()
-    this.timer = setInterval(this.forceTileReload, 15000)
+    GlobalPriortyQueue.clear();
 
     const baseLayer = L.tileLayer("tiles/{z}/{x}/{y}.png", {
       maxZoom: 6,
@@ -232,6 +472,27 @@ class WorldMap extends React.Component {
     map.entities = {}
     map.entities.Bed = L.layerGroup()
     map.entities.Ship = L.layerGroup().addTo(map)
+    map.entities.IslandTerritories = L.layerGroup().addTo(map);
+    map.entities.IslandNames = L.layerGroup().addTo(map);
+
+    var createIslandLabel = function (island) {
+      var label = "";
+      label += '<div id="island_' + island.IslandID + '" class="islandlabel">';
+      label += '<div class="islandlabel_name">' + escapeHTML(island.SettlementName) + '</div>';
+      label += '<div class="islandlabel_icon"><img class="islandlabel_size" src="' + getIslandIcon(island) + '" width="32" height="32"/></div>';
+      label += '</div>'
+      return L.divIcon({
+        className: "islandlabel",
+        html: label
+      })
+    }
+
+    var createLabelIcon = function (labelClass, labelText) {
+      return L.divIcon({
+        className: labelClass,
+        html: labelText
+      })
+    }
 
     L.control.zoom({
       position:'topright'
@@ -241,8 +502,6 @@ class WorldMap extends React.Component {
       Ships: map.entities.Ship,
     }, {position: 'topright'}).addTo(map)
 
-    map.setView([-128, 128], 2)
-
     if (this.props.onContextMenu)
       map.on("contextmenu.show", this.props.onContextMenu)
     if (this.props.onContextMenuClose)
@@ -251,7 +510,132 @@ class WorldMap extends React.Component {
     map.on("zoomend", () => {
         if (map.hasLayer(map.entities.Bed))
           map.removeLayer(map.entities.Bed)
+
+          var zoomLevel = map.getZoom();
+          if (zoomLevel < 4) {
+            map.removeLayer(map.entities.IslandNames);
+          } else {
+            map.addLayer(map.entities.IslandNames);
+    
+            // adjust icon size based on zoom level
+            var newSize = "32";
+            if (zoomLevel == 4) {
+              newSize = "19"
+            } else if (zoomLevel == 5) {
+              newSize = "25";
+            }
+            var elements = document.getElementsByClassName("islandlabel_size");
+            for (var i = 0; i < elements.length; i++) {
+              elements[i].width = newSize;
+              elements[i].height = newSize;
+            }
+          }
     })
+
+    if (config.EnableColonies) {
+      fetch("getislands")
+        .then(res => res.json())
+        .then(function (IslandDataJson) {
+          var IslandEntries = IslandDataJson.Islands;
+          var CompanyHashMap = IslandDataJson.Companies.reduce(function (map, obj) {
+            map[obj.TribeId] = obj;
+            return map;
+          }, {});
+
+          GlobalPriortyQueue.clear();
+          var now = Math.floor(Date.now() / 1000);
+          for (var j = 0; j < IslandEntries.length; j++) {
+            var Island = IslandEntries[j];
+
+            // add island to icon update list
+            getWarState(Island);
+            getPeaceState(Island);
+            var nextUpdate = Island.CombatNextUpdateSec;
+            if (Island.WarNextUpdateSec < nextUpdate)
+              nextUpdate = Island.WarNextUpdateSec;
+            GlobalPriortyQueue.enqueue(Island, now + nextUpdate + 1);
+
+            L.marker([-256 * Island.Y, 256 * Island.X], { icon: createIslandLabel(Island) }).addTo(map.entities.IslandNames);
+
+            var OwningTribe = CompanyHashMap[Island.TribeId];
+            if (OwningTribe) {
+              var circle = new IslandCircle([-256 * Island.Y, 256 * Island.X], {
+                radius: Island.Size * 256,
+                //color: Island.Color,
+                color: getTribeColor(Island.TribeId),
+                opacity: 0,
+                //fillColor: Island.Color,
+                fillColor: getTribeColor(Island.TribeId),
+                fillOpacity: 0.5
+              });
+              var PopupHTML = '';
+              circle.Island = Island;
+              if (OwningTribe.FlagURL) {
+                PopupHTML = '<p><img border="0" alt="CompanyFlag" src="' + OwningTribe.FlagURL + '" width="100" height="100"></p>';
+              }
+              PopupHTML += '<strong>' + escapeHTML(Island.SettlementName) + '</strong> <sup>[' + Island.IslandPoints + ' pts]</sup>'
+              PopupHTML += '<div style="width: 250px;" id="pop_up_war">---</div>';
+              PopupHTML += '<div style="width: 250px;" id="pop_up_phase">---</div>';
+              PopupHTML += 'Owner: ' + escapeHTML(OwningTribe.TribeName);
+              if (Island.NumSettlers >= 0) {
+                PopupHTML += '<br>Settlers: ' + Island.NumSettlers;
+              }
+              PopupHTML += '<br>Taxation: ' + Island.TaxRate.toFixed(1) + '%';
+              circle.bindPopup(PopupHTML, { showOnMouseOver: true });
+              map.entities.IslandTerritories.addLayer(circle);
+            }
+          }
+        });
+      }
+
+      map.setView([-128, 128], 2)
+  }
+
+  forceTileReload() {
+    if (config.EnableTerritory)
+    {
+      fetch("territoryURL")
+        .then(res => res.json())
+        .then(config => {
+          if (config.url) {
+            if (this.territoryLayer) {
+              this.worldMap.removeLayer(this.territoryLayer)
+              delete this.territoryLayer
+            }
+
+            this.territoryLayer = L.tileLayer(config.url + "{z}/{x}/{y}.png?t={cachebuster}", {
+              maxZoom: 6,
+              minZoom: 1,
+              bounds: L.latLngBounds([0,0],[-256,256]),
+              noWrap: true,
+              cachebuster: function() { return Math.random(); }
+            })
+
+            this.territoryLayer.addTo(this.worldMap)
+          } else {
+            console.error("Did not receive territory URL")
+          }
+        })
+        .catch((err) => {
+          console.error(err)
+          this.setState({
+            notification: {
+              type: "error",
+              msg: "Failed to get territory URL from server",
+            }
+          })
+        })
+      }
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.timer);
+  }
+
+  componentDidMount() {
+    this.constructMap()
+    this.forceTileReload()
+    this.timer = setInterval(this.forceTileReload, 15000)
   }
 
   render() {
@@ -737,10 +1121,19 @@ class Legend extends React.Component {
     const { entities, tribes } = this.props
 
     return (
-    <div id="Legend" className="info legend">
-      {Object.keys(tribes).map(id => {return (<div key={id}><i style={{background:getTribeColor(id)}}></i>{tribes[id]}<br/></div>)})}
-      <div key={'none'}><i style={{background:'grey'}}></i>{'non-tribe'}<br/></div>
-    </div>);
+      <div id="Legend" className="info legend">
+        {Object.keys(tribes).map(id => {return (
+          <div key={id} className="legend-entry">
+              <div className="legend-entry-a" style={{ background: getTribeColor(id)}}></div>
+              <div className="legend-entry-b">{tribes[id]}</div>
+          </div>
+        )})}
+        <div key="none" className="legend-entry">
+          <div className="legend-entry-a" style={{ background: "grey" }}></div>
+          <div className="legend-entry-b">None</div>
+        </div>
+      </div>
+    )
   }
 }
 
