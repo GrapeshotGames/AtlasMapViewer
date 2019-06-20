@@ -52,7 +52,7 @@ func ProcessEntities(client *redis.Client, config *Config, entityData *string, e
 		tribeDataLock.Lock()
 		*tribeData = string(js)
 		tribeDataLock.Unlock()
-/*
+
 		for _, record := range scan(client, "entityinfo:*") {
 			// log.Println(id)
 			info := newEntityInfo(record)
@@ -76,7 +76,7 @@ func ProcessEntities(client *redis.Client, config *Config, entityData *string, e
 		entityDataLock.Lock()
 		*entityData = string(js)
 		entityDataLock.Unlock()
-*/
+
 		time.Sleep(time.Duration(config.EntityFetchRateInSeconds) * time.Second)
 	}
 }
